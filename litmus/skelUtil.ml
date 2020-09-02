@@ -379,6 +379,8 @@ module Make
           begin match Cfg.mode with
           | Mode.Std ->
               O.f "static %s postlude(FILE *out,cmd_t *cmd,hist_t *hist,count_t p_true,count_t p_false,tsc_t total) {" t
+          | Mode.Sdfirm ->
+              O.f "static %s postlude(FILE *out,cmd_t *cmd,hist_t *hist,count_t p_true,count_t p_false,tsc_t total) {" t
           | Mode.PreSi ->
               O.f "static %s postlude(FILE *out,global_t *g,count_t p_true,count_t p_false,tsc_t total) {" t ;
               O.oi "hash_t *hash = &g->hash ;"
@@ -396,6 +398,9 @@ module Make
 (* Print histogram *)
           begin match Cfg.mode with
           | Mode.Std ->
+              pp_nstates "finals_outs(hist->outcomes)" ;
+              O.oi "just_dump_outcomes(out,hist);"
+          | Mode.Sdfirm ->
               pp_nstates "finals_outs(hist->outcomes)" ;
               O.oi "just_dump_outcomes(out,hist);"
           | Mode.PreSi ->
@@ -453,11 +458,33 @@ module Make
                   O.fi "fprintf(out,\"%s\",\"%s\",\"%s\");" fmt "Prefetch" prf
               | NoPL|RandomPL -> ()
               end
+          | Mode.Sdfirm ->
+              begin match Cfg.preload with
+              | CustomPL ->
+                  let fmt = "%s=" in
+                  O.fi "fprintf(out,\"%s\",\"%s\");" fmt "Prefetch" ;
+                  O.oi "prefetch_dump(out,cmd->prefetch);" ;
+                  O.oi "putc('\\n',out);"
+              | StaticPL|StaticNPL _ ->
+                  let fmt = "%s=%s\\n" in
+                  let prf = get_prefetch_info test in
+                  O.fi "fprintf(out,\"%s\",\"%s\",\"%s\");" fmt "Prefetch" prf
+              | NoPL|RandomPL -> ()
+              end
           | Mode.PreSi -> ()
           end ;
 (* Affinity info, as computed *)
           begin match Cfg.mode with
           | Mode.Std ->
+              begin match affi with
+              | Some affi ->
+                  O.oi "if (cmd->aff_mode == aff_custom) {" ;
+                  let fmt = sprintf "Affinity=%s\n"  (Affi.pp affi) in
+                  EPF.fii fmt [] ;
+                  O.oi "}"
+              | None -> ()
+              end
+          | Mode.Sdfirm ->
               begin match affi with
               | Some affi ->
                   O.oi "if (cmd->aff_mode == aff_custom) {" ;
@@ -502,6 +529,18 @@ module Make
                 O.oiii "}" ;
                 O.oii "} else if (cmd->aff_mode == aff_topo) {"  ;
                 O.oiii "printf(\"Topology %-6\" PCTR \":> %s\\n\",ngroups[0],cmd->aff_topo);" ;
+                O.oii "}"
+              end
+          | Mode.Sdfirm ->
+              if show_topos then begin
+                O.oii "if (cmd->aff_mode == aff_scan) {" ;
+                O.oiii "for (int k = 0 ; k < SCANSZ ; k++) {" ;
+                O.oiv "count_t c = ngroups[k];" ;
+                let fmt = "\"Topology %-6\" PCTR\":> %s\\n\"" in
+                O.fiv "if ((c*100)/p_true > ENOUGH) { litmus_log(%s,c,group[k]); }" fmt ;
+                O.oiii "}" ;
+                O.oii "} else if (cmd->aff_mode == aff_topo) {"  ;
+                O.oiii "litmus_log(\"Topology %-6\" PCTR \":> %s\\n\",ngroups[0],cmd->aff_topo);" ;
                 O.oii "}"
               end
           | Mode.PreSi ->
@@ -550,6 +589,12 @@ module Make
           let fmt = sprintf "Time %s %%f\n"  doc.Name.name in
           EPF.fi fmt ["total / 1000000.0"] ;
           O.oi "fflush(out);" ;
+          begin match Cfg.mode with
+          | Mode.Std -> () ;
+          | Mode.Sdfirm ->
+            O.fi "litmus_observed(%s, cond_true, cond_false);" pp_cond ;
+          | Mode.PreSi -> () ;
+          end ;
           if Cfg.exit_cond then O.oi "return cond;" ;
           O.o "}" ;
           O.o "" ;

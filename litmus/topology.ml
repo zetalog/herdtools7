@@ -157,6 +157,7 @@ end = struct
 (*
   let add_next = match Cfg.mode with
   | Mode.Std -> fun n xs  -> n+List.length xs
+  | Mode.Sdfirm -> fun n xs  -> n+List.length xs
   | Mode.PreSi -> fun _ _ ->  Cfg.smt
 *)
 
@@ -288,6 +289,9 @@ let part pp_part maxelt maxpart k r =
     O.f "#define SCANLINE %i" sz ;
     begin match Cfg.mode with
     | Mode.Std ->
+        O.o "" ;
+        O.o "static count_t ngroups[SCANSZ];"
+    | Mode.Sdfirm ->
         O.o "" ;
         O.o "static count_t ngroups[SCANSZ];"
     | Mode.PreSi -> ()
@@ -425,6 +429,7 @@ let part pp_part maxelt maxpart k r =
 
   let dump_alloc vss = match Cfg.mode with
   | Mode.Std -> dump_alloc_gen std_kont std_handle
+  | Mode.Sdfirm -> dump_alloc_gen std_kont std_handle
   | Mode.PreSi -> dump_alloc_gen presi_kont (presi_handle vss)
     
 end 

@@ -78,3 +78,37 @@ static void merge_hists(hist_t *h0, hist_t *h1) {
 }
 
 "
+
+let hists_defs =
+"
+typedef struct hist_t {
+  outs_t *outcomes ;
+  count_t n_pos,n_neg ;
+} hist_t ;
+
+static hist_t *alloc_hists(int sz, const char *name) {
+  hist_t *p = malloc_check(sizeof(hist_t) * sz,name) ;
+  for (int k=0 ; k<sz ; k++) {
+    p[k].outcomes = NULL ;
+    p[k].n_pos = p[k].n_neg = 0 ;
+  }
+  return p ;
+}
+
+static void free_hists(int sz, hist_t *p, const char *name) {
+  for (int k=0 ; k<sz ; k++)
+    free_outs(p[k].outcomes) ;
+  free_check(p,name) ;
+}
+
+static void add_outcome(hist_t *h, count_t v, outcome_t o, int show) {
+  h->outcomes = add_outcome_outs(h->outcomes,o,NOUTS,v,show) ;
+}
+
+static void merge_hists(hist_t *h0, hist_t *h1) {
+  h0->n_pos += h1->n_pos ;
+  h0->n_neg += h1->n_neg ;
+  h0->outcomes = merge_outs(h0->outcomes,h1->outcomes,NOUTS) ;
+}
+
+"

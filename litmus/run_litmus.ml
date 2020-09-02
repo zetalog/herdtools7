@@ -53,6 +53,7 @@ module Make(O:Config)(Tar:Tar.S)(D:Test) =
         let utils =
           let k = match O.mode with
           | Mode.Std -> ["outs.c";]
+          | Mode.Sdfirm -> ["outs.c";]
           | Mode.PreSi -> ["litmus_io.c"] in
           let k = "litmus_rand.c"::k in
           let utils =

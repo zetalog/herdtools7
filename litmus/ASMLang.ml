@@ -64,12 +64,14 @@ module RegMap = A.RegMap)
 
       let compile_addr_inline = match O.mode with
       | Mode.Std -> sprintf "_a->%s[_i]"
+      | Mode.Sdfirm -> sprintf "_a->%s[_i]"
       | Mode.PreSi -> sprintf "*%s"
 
       and compile_addr_fun x = sprintf "*%s" x
 
       and compile_val_inline = match O.mode with
       | Mode.Std -> checkVal Tmpl.dump_v
+      | Mode.Sdfirm -> checkVal Tmpl.dump_v
       | Mode.PreSi -> checkVal A.V.pp_v
 
       let dump_clobbers chan t =
@@ -400,6 +402,7 @@ module RegMap = A.RegMap)
 
         let compile_out_reg = match O.mode with
         | Mode.Std -> Tmpl.compile_out_reg
+        | Mode.Sdfirm -> Tmpl.compile_out_reg
         | Mode.PreSi ->
             fun proc reg ->
               let ty =

@@ -195,6 +195,8 @@ module Make(O:Config)(Tar:Tar.S) =
             cpy ~prf:"#define CACHE 1" fnames "utils" ".h"
           else *)
             cpy fnames "utils" ".h"
+      | Mode.Sdfirm ->
+          fnames
       | Mode.PreSi ->
           let fnames = cpy' fnames "presi" "utils" ".c" in
           cpy' fnames "presi" "utils" ".h" in
@@ -203,6 +205,8 @@ module Make(O:Config)(Tar:Tar.S) =
         | Mode.Std ->
             let fnames = cpy fnames "outs" ".c" in
             let fnames = cpy fnames "outs" ".h" in
+            fnames
+        | Mode.Sdfirm ->
             fnames
         | Mode.PreSi ->
             fnames in

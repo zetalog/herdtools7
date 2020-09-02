@@ -31,11 +31,29 @@ module Make (O:Config) =
       let dump_def var x = out (sprintf "#define %s %s" var x) in
       dump_def "SIZE_OF_TEST" (sprintf "%i" O.size) ;
       dump_def "NUMBER_OF_RUN" (sprintf "%i" O.runs) ;
-      dump_def "AVAIL"
-        (match O.avail with
-        | None -> "1" | Some n -> sprintf "%i" n) ;
       begin match O.mode with
       | Mode.Std ->
+        dump_def "AVAIL"
+          (match O.avail with
+          | None -> "1" | Some n -> sprintf "%i" n)
+      | Mode.Sdfirm -> ()
+      | Mode.PreSi ->
+        dump_def "AVAIL"
+          (match O.avail with
+          | None -> "1" | Some n -> sprintf "%i" n)
+      end ;
+      begin match O.mode with
+      | Mode.Std ->
+          begin
+            let open Stride in
+            match O.stride with
+            | No -> dump_def "STRIDE" "(-1)"
+            | Adapt ->  dump_def "STRIDE" "N"
+            | St i ->  dump_def "STRIDE" (sprintf "%i" i)
+          end ;
+          dump_def "MAX_LOOP"
+            (let x = O.timeloop in if x > 0 then sprintf "%i" x else "0")
+      | Mode.Sdfirm ->
           begin
             let open Stride in
             match O.stride with

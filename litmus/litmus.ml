@@ -297,6 +297,7 @@ let () =
       | None ->
           begin match !mode with
           | Mode.Std -> true
+          | Mode.Sdfirm -> true
           | Mode.PreSi -> false
           end
       | Some b -> b
@@ -312,6 +313,7 @@ let () =
       let platform = "_linux"
       let affinity = match !mode with
       | Mode.Std -> !affinity
+      | Mode.Sdfirm -> !affinity
       | Mode.PreSi -> Affinity.Scan
       let logicalprocs = !logicalprocs
       let linkopt = !linkopt

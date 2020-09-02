@@ -14,15 +14,17 @@
 (* "http://www.cecill.info". We also give a copy in LICENSE.txt.            *)
 (****************************************************************************)
 
-type t = Std | PreSi
+type t = Std | Sdfirm | PreSi
 
-let tags = ["std";"presi";]
+let tags = ["std";"presi";"sdfirm"]
 
 let parse tag = match Misc.lowercase tag with
 | "std" -> Some Std
+| "sdfirm" -> Some Sdfirm
 | "presi" -> Some PreSi
 | _ -> None
 
 let pp = function
   | Std -> "std"
+  | Sdfirm -> "sdfirm"
   | PreSi -> "presi"

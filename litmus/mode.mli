@@ -14,5 +14,5 @@
 (* "http://www.cecill.info". We also give a copy in LICENSE.txt.            *)
 (****************************************************************************)
 
-type t = Std | PreSi
+type t = Std | Sdfirm | PreSi
 include ParseTag.Opt with type t := t

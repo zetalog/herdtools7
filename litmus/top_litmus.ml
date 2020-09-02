@@ -205,6 +205,9 @@ end = struct
                 | Mode.Std ->
                    let module S = Skel.Make(O)(Pseudo)(A')(T)(Out)(Lang) in
                    S.dump
+                | Mode.Sdfirm ->
+                   let module S = Sdfirm.Make(O)(Pseudo)(A')(T)(Out)(Lang) in
+                   S.dump
                 | Mode.PreSi ->
                    let module S = PreSi.Make(O)(Pseudo)(A')(T)(Out)(Lang) in
                    S.dump in

@@ -442,78 +442,166 @@ let dump_c xcode names =
         O.oi "return 0;" ;
         O.o"}"
       end ;
-      arch,srcs,utils)
+      arch,docs,srcs,utils)
     (Tar.outname (MyName.outname "run" (if xcode then ".m" else ".c")))
 
 
-let dump_c_cont xcode arch sources utils =
+let dump_c_cont xcode arch docs sources utils =
   let sources = List.map Filename.basename  sources in
 (* Makefile *)
   let infile = not xcode in
   Misc.output_protect
     (fun chan ->
-      makefile_vars chan infile arch sources ;
+      match Cfg.mode with
+      | Mode.Std ->
+        makefile_vars chan infile arch sources ;
 (* Various intermediate targets *)
-      fprintf chan "T=$(SRC:.c=.t)\n" ;
-      fprintf chan "H=$(SRC:.c=.h)\n" ;
-      if not xcode then begin
-        fprintf chan "OBJ=$(SRC:.c=.o)\n" ;
-        fprintf chan "EXE=run.exe\n" ;
-        fprintf chan "\n" ;
-      end ;
-(* Entry point *)
-      if xcode then begin
-        fprintf chan "all: $(H)\n" ;
-      end else begin
-        fprintf chan "all: $(EXE)\n" ;
-      end ;
-      fprintf chan "\n" ;
-      makefile_clean chan ((if infile then " obj " else " ")^"$(H)");
-      if not xcode then makefile_utils chan utils ;
-(* Rules *)
-      if not xcode then begin
-        if infile then begin
-          fprintf chan "obj: $(OBJ) src\n" ;
-          fprintf chan "\tsed -e 's|.c$$|.o|g' < src > obj\n\n"
+        fprintf chan "T=$(SRC:.c=.t)\n" ;
+        fprintf chan "H=$(SRC:.c=.h)\n" ;
+        if not xcode then begin
+          fprintf chan "OBJ=$(SRC:.c=.o)\n" ;
+          fprintf chan "EXE=run.exe\n" ;
+          fprintf chan "\n" ;
         end ;
-        let o1 =
-          if infile then "$(UTILS) obj run.o"
-          else "$(UTILS) $(OBJ) run.o" in
-        let o2 =
-          if infile then "$(UTILS) @obj run.o"
-          else o1 in
-        fprintf chan "$(EXE): %s\n" o1 ;
-        fprintf chan "\t$(GCC)  $(GCCOPTS) $(LINKOPTS) -o $@ %s\n" o2 ;
+(* Entry point *)
+        if xcode then begin
+          fprintf chan "all: $(H)\n" ;
+        end else begin
+          fprintf chan "all: $(EXE)\n" ;
+        end ;
         fprintf chan "\n" ;
+        makefile_clean chan ((if infile then " obj " else " ")^"$(H)");
+        if not xcode then makefile_utils chan utils ;
+(* Rules *)
+        if not xcode then begin
+          if infile then begin
+            fprintf chan "obj: $(OBJ) src\n" ;
+            fprintf chan "\tsed -e 's|.c$$|.o|g' < src > obj\n\n"
+          end ;
+          let o1 =
+            if infile then "$(UTILS) obj run.o"
+            else "$(UTILS) $(OBJ) run.o" in
+          let o2 =
+            if infile then "$(UTILS) @obj run.o"
+            else o1 in
+          fprintf chan "$(EXE): %s\n" o1 ;
+          fprintf chan "\t$(GCC)  $(GCCOPTS) $(LINKOPTS) -o $@ %s\n" o2 ;
+          fprintf chan "\n" ;
 (* .o pattern rule *)
-        fprintf chan "%%.o:%%.c\n" ;
-        fprintf chan
-        "\t$(GCC) $(GCCOPTS) $(LINKOPTS) -c -o $@ $<\n" ;
-        fprintf chan "\n"
-      end ;
+          fprintf chan "%%.o:%%.c\n" ;
+          fprintf chan
+          "\t$(GCC) $(GCCOPTS) $(LINKOPTS) -c -o $@ $<\n" ;
+          fprintf chan "\n"
+        end ;
 (* .s pattern rule *)
-      fprintf chan "%%.s:%%.c\n" ;
-      fprintf chan "\t$(GCC) -DASS $(GCCOPTS) -S $<\n" ;
-      fprintf chan "\n" ;
+        fprintf chan "%%.s:%%.c\n" ;
+        fprintf chan "\t$(GCC) -DASS $(GCCOPTS) -S $<\n" ;
+        fprintf chan "\n" ;
 (* .t pattern rule *)
-      fprintf chan "%%.t:%%.s\n" ;
-      fprintf chan "\tawk -f show.awk $< > $@\n" ;
-      fprintf chan "\n" ;
+        fprintf chan "%%.t:%%.s\n" ;
+        fprintf chan "\tawk -f show.awk $< > $@\n" ;
+        fprintf chan "\n" ;
  (* .h pattern rule *)
-      fprintf chan "%%.h:%%.t\n" ;
-      fprintf chan "\tsh toh.sh $< > $@\n" ;
-      fprintf chan "\n" ;
+        fprintf chan "%%.h:%%.t\n" ;
+        fprintf chan "\tsh toh.sh $< > $@\n" ;
+        fprintf chan "\n" ;
 (* Dependencies *)
-      if not xcode then begin
-        List.iter
-          (fun src ->
+        if not xcode then begin
+          List.iter
+            (fun src ->
+              let base = Filename.chop_extension src in
+              fprintf chan "%s.o: %s.h %s.c\n" base base base)
+            sources ;
+        end ;
+        fprintf chan "\n" ;
+      | Mode.Sdfirm ->
+        List.iteri
+          (fun k src ->
             let base = Filename.chop_extension src in
-            fprintf chan "%s.o: %s.h %s.c\n" base base base)
-          sources ;
-        fprintf chan "\n"
-      end ;
+            let doc = List.nth docs k in
+            let name = MyName.as_symbol doc in
+            fprintf chan "obj-$(CONFIG_%s) += %s.rel\n" name base)
+          sources
+      | Mode.PreSi ->
+        makefile_vars chan infile arch sources ;
+(* Various intermediate targets *)
+        fprintf chan "T=$(SRC:.c=.t)\n" ;
+        fprintf chan "H=$(SRC:.c=.h)\n" ;
+        if not xcode then begin
+          fprintf chan "OBJ=$(SRC:.c=.o)\n" ;
+          fprintf chan "EXE=run.exe\n" ;
+          fprintf chan "\n" ;
+        end ;
+(* Entry point *)
+        if xcode then begin
+          fprintf chan "all: $(H)\n" ;
+        end else begin
+          fprintf chan "all: $(EXE)\n" ;
+        end ;
+        fprintf chan "\n" ;
+        makefile_clean chan ((if infile then " obj " else " ")^"$(H)");
+        if not xcode then makefile_utils chan utils ;
+(* Rules *)
+        if not xcode then begin
+          if infile then begin
+            fprintf chan "obj: $(OBJ) src\n" ;
+            fprintf chan "\tsed -e 's|.c$$|.o|g' < src > obj\n\n"
+          end ;
+          let o1 =
+            if infile then "$(UTILS) obj run.o"
+            else "$(UTILS) $(OBJ) run.o" in
+          let o2 =
+            if infile then "$(UTILS) @obj run.o"
+            else o1 in
+          fprintf chan "$(EXE): %s\n" o1 ;
+          fprintf chan "\t$(GCC)  $(GCCOPTS) $(LINKOPTS) -o $@ %s\n" o2 ;
+          fprintf chan "\n" ;
+(* .o pattern rule *)
+          fprintf chan "%%.o:%%.c\n" ;
+          fprintf chan
+          "\t$(GCC) $(GCCOPTS) $(LINKOPTS) -c -o $@ $<\n" ;
+          fprintf chan "\n"
+        end ;
+(* .s pattern rule *)
+        fprintf chan "%%.s:%%.c\n" ;
+        fprintf chan "\t$(GCC) -DASS $(GCCOPTS) -S $<\n" ;
+        fprintf chan "\n" ;
+(* .t pattern rule *)
+        fprintf chan "%%.t:%%.s\n" ;
+        fprintf chan "\tawk -f show.awk $< > $@\n" ;
+        fprintf chan "\n" ;
+ (* .h pattern rule *)
+        fprintf chan "%%.h:%%.t\n" ;
+        fprintf chan "\tsh toh.sh $< > $@\n" ;
+        fprintf chan "\n" ;
+(* Dependencies *)
+        if not xcode then begin
+          List.iter
+            (fun src ->
+              let base = Filename.chop_extension src in
+              fprintf chan "%s.o: %s.h %s.c\n" base base base)
+            sources ;
+        fprintf chan "\n" ;
+        end ;
       ())
-    (Tar.outname (MyName.outname "Makefile" "")) ;
+    (Tar.outname (MyName.outname "Makefile" ".litmus")) ;
+(* Kconfig.litmus *)
+  let infile = not xcode in
+  Misc.output_protect
+    (fun chan ->
+      match Cfg.mode with
+      | Mode.Std -> ()
+      | Mode.Sdfirm ->
+        if not xcode then begin
+          List.iter
+            (fun doc ->
+              let name = MyName.as_symbol doc in
+              fprintf chan "config %s\n\tbool \"%s\"\n\n" name name)
+            docs ;
+        end
+      | Mode.PreSi -> () ;
+      ())
+    (Tar.outname (MyName.outname "Kconfig" ".litmus")) ;
 (* Source list in file  *)
   if infile then begin
     Misc.output_protect
@@ -588,8 +676,8 @@ let from_files =
             let xcode = match d with
             | Driver.XCode -> true
             | _ -> false in
-            let arch,sources,utils = dump_c xcode names in
-            dump_c_cont xcode arch sources utils ;
+            let arch,docs,sources,utils = dump_c xcode names in
+            dump_c_cont xcode arch docs sources utils ;
             arch in
       if Cfg.cross then dump_cross arch
 end
