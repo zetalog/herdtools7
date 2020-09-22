@@ -1119,8 +1119,9 @@ Monad type:
           env
 
       let debug_add_initpte env =
+        eprintf "Complete pte initialisation:\n[%s] -> " (debug_env env) ;
         let r = add_initpte env in
-        eprintf "Complete pte initialisation:\n[%s] -> [%s]\n" (debug_env env) (debug_env r) ;
+        eprintf "[%s]\n" (debug_env r) ;
         r
 
 
