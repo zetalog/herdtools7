@@ -194,7 +194,8 @@ module Make
 (* Group pteval components together *)
       type ipte =
           { pte_v:V.v; oa_v:V.v; af_v:V.v;
-            db_v:V.v; dbm_v:V.v; valid_v:V.v; }
+            db_v:V.v; dbm_v:V.v; valid_v:V.v;
+            setbits: Op.op1 list; }
 
       let extract_af v = M.op1 Op.AF v
       let extract_db v = M.op1 Op.DB v
@@ -219,7 +220,7 @@ module Make
         extract_db pte_v >>|
         extract_dbm pte_v) >>=
         (fun ((((oa_v,valid_v),af_v),db_v),dbm_v) ->
-          M.unitT {pte_v; oa_v; af_v; db_v; dbm_v; valid_v})
+          M.unitT {pte_v; oa_v; af_v; db_v; dbm_v; valid_v; setbits=[];})
 
       let get_flag f mpte = mpte >>= fun p -> M.unitT (p,f p)
       let get_oa mpte = mpte >>= fun p -> M.unitT p.oa_v
@@ -236,10 +237,23 @@ module Make
             M.choiceT bit_clear (kont1 m) (kont2 m)
 
       let check_ptw proc dir a_virt ma an ii mdirect mok mfault =
+        let setbits_get_oa a_pte m =
+          M.delay
+            (m >>= fun pte_v -> match pte_v.setbits with
+            | [] -> M.unitT pte_v.oa_v
+            | ops ->
+                let mops =
+                  List.fold_right
+                    (fun op m -> m >>= fun v -> M.op1 op v)
+                    ops (M.unitT pte_v.pte_v) in
+                (mops >>= fun v -> write_whole_pte_val AArch64.N a_pte v ii
+                 >>|  M.unitT pte_v.oa_v)
+                >>= fun (_,oa) -> M.unitT oa)
+            >>= fun (_,m) -> m in
         let mfault m _a = mfault (get_oa m) a_virt
-        and mok m a = mok (get_oa m) a in
+        and mok a_pte m a = mok (setbits_get_oa a_pte m) a in
 
-        let set_bit op a_pte  =
+        let _set_bit op a_pte  =
           mextract_whole_pte_val AArch64.X a_pte ii >>=
           M.op1 op >>= fun v ->
           write_whole_pte_val AArch64.X a_pte v ii in
@@ -261,14 +275,14 @@ module Make
           explicit stores or atomics
          *)
 
-        let notTTHM a_virt ma pte_v  =
+        let notTTHM a_pte a_virt ma pte_v  =
           let check_db ma =
             do_check_bit_clear ii ma
               (fun pte_v -> pte_v.db_v)
               (fun ma -> mfault ma a_virt)
-              (fun ma -> mok ma pte_v.oa_v) in
+              (fun ma -> mok a_pte ma pte_v.oa_v) in
           let kont_af ma = begin match dir with
-          | Dir.R -> (mok ma pte_v.oa_v)
+          | Dir.R -> (mok a_pte ma pte_v.oa_v)
           | Dir.W -> check_db ma
           end in
           do_check_bit_clear ii ma (fun pte_v -> pte_v.af_v)
@@ -283,11 +297,13 @@ module Make
           A store where pte_x has the dirty bit clear will raise a permission fault.
          *)
 
-        let isTTHM_and_HA a_pte ma kont =
+        let isTTHM_and_HA ma kont =
           let kont_af_clear ma =
             M.delay
-              (ma >>= fun pte_v ->
-              set_bit Op.SetAF a_pte  >>= fun _ -> M.unitT pte_v) >>=
+              (ma >>=
+               fun pte_v ->
+                 M.unitT { pte_v with setbits = Op.SetAF::pte_v.setbits })
+            >>=
             fun (_,ma) -> kont ma in
           do_check_bit_clear ii ma (fun pte_v -> pte_v.af_v)
             kont_af_clear kont in
@@ -308,20 +324,19 @@ module Make
          *)
 
         let isTTHM_and_HA_and_HD a_pte ma pte_v =
-          let kont_R ma = mok ma pte_v.oa_v in
+          let kont_R ma = mok a_pte ma pte_v.oa_v in
           let kont_W ma =
             let kont_db ma =
               do_check_bit_clear ii ma (fun pte_v -> pte_v.dbm_v)
                 (fun ma -> mfault ma a_virt)
                 (fun ma ->
                   M.delay
-                    (ma >>= fun pte_v ->
-                    set_bit Op.SetDB a_pte >>= fun _ -> M.unitT pte_v) >>=
-                  fun (_,ma) -> kont_R ma) in
+                    (ma >>= fun pte_v -> M.unitT { pte_v with setbits = Op.SetDB::pte_v.setbits })
+                    >>= fun (_,ma) -> kont_R ma) in
             do_check_bit_clear ii ma (fun pte_v -> pte_v.db_v)
               kont_db kont_R in
           let kont = match dir with Dir.R -> kont_R | Dir.W -> kont_W in
-          isTTHM_and_HA a_pte ma kont  in
+          isTTHM_and_HA ma kont  in
 
 
         let mvirt = begin
@@ -338,15 +353,15 @@ module Make
                   and ha = TopConf.dirty.ha proc
                   and hd = TopConf.dirty.hd proc in
                   if (not tthm || (tthm && (not ha && not hd))) then
-                    notTTHM a_virt ma pte_v
+                    notTTHM a_virt a_pte ma pte_v
                   else if (tthm && ha && not hd) then
-                    let kont_R ma = mok ma pte_v.oa_v in
+                    let kont_R ma = mok a_pte ma pte_v.oa_v in
                     let kont_W ma =
                       do_check_bit_clear ii ma (fun pte_v -> pte_v.db_v)
                         (fun ma -> mfault ma a_virt) kont_R in
                     let kont = match dir with
                     | Dir.R -> kont_R | Dir.W -> kont_W in
-                    isTTHM_and_HA a_pte ma kont
+                    isTTHM_and_HA ma kont
                   else
                     isTTHM_and_HA_and_HD a_pte ma pte_v in
 
